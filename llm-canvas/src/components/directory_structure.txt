@@ -1,0 +1,20 @@
+canvas
+card
+common
+directory_structure.txt
+
+./components
+    ./canvas:
+    Canvas.jsx
+    Canvas.styles.js
+
+    ./card:
+    Card.jsx
+    Card.styles.js
+    CardParameters.jsx
+    CardSection.jsx
+
+App.css
+App.jsx
+index.css
+main.jsx

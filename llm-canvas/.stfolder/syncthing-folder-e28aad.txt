@@ -1,0 +1,5 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: psjwc-mtk2j
+created: 2024-11-18T14:18:00+01:00

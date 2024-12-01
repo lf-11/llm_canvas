@@ -1,0 +1,11 @@
+# Dependencies
+llm-canvas/node_modules/
+
+# Build outputs
+
+
+# Logs
+*.log
+
+# Environment files
+

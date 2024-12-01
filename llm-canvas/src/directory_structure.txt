@@ -1,0 +1,9 @@
+App.css
+App.jsx
+assets
+directory_structure.txt
+index.css
+main.jsx
+
+./assets:
+react.svg
