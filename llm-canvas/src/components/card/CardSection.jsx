@@ -175,6 +175,8 @@ const CardSection = ({ section, isLast, onInputChange }) => {
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
+      let currentResponses = Array(batchCount).fill('');
+      const processedChunks = new Set(); // Track processed chunks
 
       while (true) {
         const { done, value } = await reader.read();
@@ -184,17 +186,15 @@ const CardSection = ({ section, isLast, onInputChange }) => {
         const lines = chunk.split('\n');
         
         for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            if (line.includes('[DONE]')) continue;
-            
+          if (line.startsWith('data: ') && !line.includes('[DONE]')) {
             try {
               const data = JSON.parse(line.slice(5));
-              if (data.index !== undefined && data.text) {
-                setResponses(prev => {
-                  const newResponses = [...prev];
-                  newResponses[data.index] = (newResponses[data.index] || '') + data.text;
-                  return newResponses;
-                });
+              const chunkId = `${data.index}-${data.text}`; // Create unique identifier for chunk
+              
+              if (data.index !== undefined && data.text && !processedChunks.has(chunkId)) {
+                processedChunks.add(chunkId);
+                currentResponses[data.index] = (currentResponses[data.index] || '') + data.text;
+                setResponses([...currentResponses]);
               }
             } catch (e) {
               console.error('Error parsing SSE data:', e);
@@ -241,7 +241,20 @@ const CardSection = ({ section, isLast, onInputChange }) => {
               min="1"
               max="40"
               value={batchCount}
-              onChange={(e) => setBatchCount(Math.min(40, Math.max(1, parseInt(e.target.value) || 1)))}
+              onChange={(e) => {
+                const input = e.target.value;
+                if (input === '') {
+                  setBatchCount('');
+                } else {
+                  const value = Math.min(40, Math.max(1, parseInt(input) || 1));
+                  setBatchCount(value);
+                }
+              }}
+              onBlur={(e) => {
+                if (batchCount === '') {
+                  setBatchCount(1);
+                }
+              }}
               disabled={isBatchProcessing}
             />
           </div>
@@ -276,7 +289,6 @@ const CardSection = ({ section, isLast, onInputChange }) => {
         <FloatingBatchResults
           results={responses}
           onClose={() => setShowBatchResults(false)}
-          initialPosition={{ x: 100, y: 100 }}
         />
       )}
       {!isLast && <Divider />}

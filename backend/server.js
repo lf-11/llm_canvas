@@ -122,13 +122,11 @@ app.post('/chat', async (req, res) => {
 app.post('/chat/batch', async (req, res) => {
   const { messages, batchCount, ...parameters } = req.body;
   
-  // Set headers for SSE
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
   try {
-    // Process each request in parallel
     const promises = Array(batchCount).fill().map(async (_, index) => {
       const vllmRequestBody = {
         model: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf",
@@ -144,8 +142,6 @@ app.post('/chat/batch', async (req, res) => {
         responseType: 'stream'
       });
 
-      let accumulatedText = '';
-
       response.data.on('data', (chunk) => {
         const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
         for (const line of lines) {
@@ -155,11 +151,9 @@ app.post('/chat/batch', async (req, res) => {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.choices && data.choices[0].delta.content) {
-                accumulatedText += data.choices[0].delta.content;
                 res.write(`data: ${JSON.stringify({ 
                   index, 
-                  text: data.choices[0].delta.content,
-                  isComplete: false 
+                  text: data.choices[0].delta.content
                 })}\n\n`);
               }
             } catch (e) {
@@ -171,11 +165,6 @@ app.post('/chat/batch', async (req, res) => {
 
       return new Promise((resolve) => {
         response.data.on('end', () => {
-          res.write(`data: ${JSON.stringify({ 
-            index, 
-            text: accumulatedText,
-            isComplete: true 
-          })}\n\n`);
           resolve();
         });
       });
