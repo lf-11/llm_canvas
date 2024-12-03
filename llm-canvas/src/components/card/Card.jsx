@@ -15,7 +15,7 @@ import {
   DeleteButton
 } from './Card.styles';
 
-const Card = ({ id, sections, position, onAddSection, onInputChange, onDelete }) => {
+const Card = ({ id, sections, position, onAddSection, onInputChange, onDelete, onShowBatchResults }) => {
   const [allExpanded, setAllExpanded] = useState(true);
   const [cardName, setCardName] = useState("Prompt Variations");
   const [isEditing, setIsEditing] = useState(false);
@@ -97,6 +97,7 @@ const Card = ({ id, sections, position, onAddSection, onInputChange, onDelete })
               section={section}
               isLast={index === sections.length - 1}
               onInputChange={onInputChange}
+              onShowBatchResults={onShowBatchResults}
             />
           ))}
         </SectionsWrapper>

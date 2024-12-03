@@ -12,7 +12,6 @@ import {
   BatchInput,
 } from './Card.styles';
 import SectionParameters from './SectionParameters';
-import FloatingBatchResults from '../floating-windows/FloatingBatchResults';
 
 const defaultParameters = {
   model: 'Mistral-Small-Instruct-2409-Q6_K_L.gguf',
@@ -26,11 +25,9 @@ const defaultParameters = {
   maxTokens: 2000
 };
 
-const CardSection = ({ section, isLast, onInputChange }) => {
+const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [showBatchResults, setShowBatchResults] = useState(false);
-  const [batchResults, setBatchResults] = useState([]);
   const [batchCount, setBatchCount] = useState(5);
   const [isBatchProcessing, setIsBatchProcessing] = useState(false);
   const [responses, setResponses] = useState([]);
@@ -148,7 +145,6 @@ const CardSection = ({ section, isLast, onInputChange }) => {
     
     setIsBatchProcessing(true);
     setResponses(Array(batchCount).fill(''));
-    setShowBatchResults(true);
 
     try {
       const { model, systemPrompt, ...parameters } = section.parameters || defaultParameters;
@@ -195,6 +191,8 @@ const CardSection = ({ section, isLast, onInputChange }) => {
                 processedChunks.add(chunkId);
                 currentResponses[data.index] = (currentResponses[data.index] || '') + data.text;
                 setResponses([...currentResponses]);
+                // Pass results up to parent
+                onShowBatchResults([...currentResponses]);
               }
             } catch (e) {
               console.error('Error parsing SSE data:', e);
@@ -285,12 +283,6 @@ const CardSection = ({ section, isLast, onInputChange }) => {
           </SectionContent>
         )}
       </SectionContainer>
-      {showBatchResults && (
-        <FloatingBatchResults
-          results={responses}
-          onClose={() => setShowBatchResults(false)}
-        />
-      )}
       {!isLast && <Divider />}
     </>
   );

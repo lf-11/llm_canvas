@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../card/Card';
+import FloatingBatchResults from '../floating-windows/FloatingBatchResults';
 import { CanvasContainer, CanvasContent, AddButton } from './Canvas.styles';
 
-const Canvas = () => {
+const Canvas = ({ onShowBatchResults }) => {
   const [zoom, setZoom] = useState(1);
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
   const [cards, setCards] = useState([
@@ -112,6 +113,11 @@ const Canvas = () => {
     setCards(cards.filter(card => card.id !== cardId));
   };
 
+  const handleShowBatchResults = (results) => {
+    console.log('Showing batch results:', results); // Debug log
+    onShowBatchResults(results);
+  };
+
   useEffect(() => {
     const container = document.querySelector('.canvas-container');
     container.addEventListener('wheel', handleWheel, { passive: false });
@@ -136,6 +142,7 @@ const Canvas = () => {
                 handleInputChange(card.id, sectionId, field, value)
               }
               onDelete={handleDeleteCard}
+              onShowBatchResults={handleShowBatchResults}
             />
           ))}
         </CanvasContent>

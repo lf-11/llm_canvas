@@ -30,7 +30,6 @@ function App() {
               key={window.id}
               results={window.results}
               onClose={() => closeWindow(window.id)}
-              initialPosition={window.position}
             />
           );
         }
