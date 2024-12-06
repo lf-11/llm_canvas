@@ -65,7 +65,7 @@ const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => 
 
   const generateResponse = async () => {
     try {
-      const { model, systemPrompt, ...parameters } = section.parameters || defaultParameters;
+      const { model, systemPrompt, maxTokens, ...parameters } = section.parameters || defaultParameters;
       
       // Clear existing output
       onInputChange(section.id, 'output', '');
@@ -75,10 +75,7 @@ const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => 
           { role: "system", content: systemPrompt || '' },
           { role: "user", content: section.input }
         ],
-        temperature: parameters.temperature,
-        topK: parameters.topK,
-        topP: parameters.topP,
-        maxTokens: parameters.maxTokens || 2000
+        ...parameters
       };
 
       const response = await fetch('http://localhost:3000/chat', {
@@ -147,11 +144,10 @@ const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => 
     const initialResponses = Array(batchCount).fill('');
     setResponses(initialResponses);
     
-    // Create window only ONCE at the start
     onShowBatchResults(initialResponses);
 
     try {
-        const { model, systemPrompt, ...parameters } = section.parameters || defaultParameters;
+        const { model, systemPrompt, maxTokens, ...parameters } = section.parameters || defaultParameters;
         
         const requestBody = {
             messages: [
@@ -176,31 +172,55 @@ const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => 
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let currentResponses = Array(batchCount).fill('');
-        const processedChunks = new Set();
+        let buffer = '';  // Add a buffer for incomplete chunks
 
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
+            // Append new chunk to buffer and process complete lines
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            
+            // Keep the last potentially incomplete line in buffer
+            buffer = lines.pop() || '';
             
             for (const line of lines) {
                 if (line.startsWith('data: ') && !line.includes('[DONE]')) {
                     try {
                         const data = JSON.parse(line.slice(5));
-                        const chunkId = `${data.index}-${data.text}`;
-                        
-                        if (data.index !== undefined && data.text && !processedChunks.has(chunkId)) {
-                            processedChunks.add(chunkId);
-                            currentResponses[data.index] = (currentResponses[data.index] || '') + data.text;
-                            // Just update the responses state, don't create new window
-                            setResponses([...currentResponses]);
-                            // Update existing window content
-                            onShowBatchResults([...currentResponses]);
+                        if (data.index !== undefined && data.text) {
+                            // Ensure we have a valid index
+                            if (data.index >= 0 && data.index < batchCount) {
+                                currentResponses[data.index] = (currentResponses[data.index] || '') + data.text;
+                                // Update both states
+                                setResponses([...currentResponses]);
+                                onShowBatchResults([...currentResponses]);
+                            }
                         }
                     } catch (e) {
-                        console.error('Error parsing SSE data:', e);
+                        console.error('Error parsing SSE data:', e, 'Line:', line);
+                    }
+                }
+            }
+        }
+
+        // Process any remaining complete lines in buffer
+        if (buffer) {
+            const lines = buffer.split('\n');
+            for (const line of lines) {
+                if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+                    try {
+                        const data = JSON.parse(line.slice(5));
+                        if (data.index !== undefined && data.text) {
+                            if (data.index >= 0 && data.index < batchCount) {
+                                currentResponses[data.index] = (currentResponses[data.index] || '') + data.text;
+                                setResponses([...currentResponses]);
+                                onShowBatchResults([...currentResponses]);
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Error parsing final buffer SSE data:', e);
                     }
                 }
             }

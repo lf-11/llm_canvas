@@ -9,11 +9,13 @@ const app = express();
 const llmConfig = {
   local: {
     baseUrl: 'http://localhost:8000',
-    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf"
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf",
+    host: 'localhost'
   },
   remote: {
     baseUrl: 'http://192.168.178.61:8000',
-    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf"
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf",
+    host: '192.168.178.61'
   }
 };
 
@@ -33,11 +35,35 @@ app.use((req, res, next) => {
   next();
 });
 
-// Add endpoint to switch servers
+// Database configuration based on server type
+const dbConfig = {
+  local: {
+    user: 'postgres',
+    host: 'localhost',
+    database: 'LLM_Canvas',
+    password: 'postgres',
+    port: 5432,
+  },
+  remote: {
+    user: 'postgres',
+    host: '192.168.178.61',  // Same as your Ubuntu machine's IP
+    database: 'LLM_Canvas',
+    password: 'postgres',
+    port: 5432,
+  }
+};
+
+// Create pool with initial configuration
+let pool = new Pool(dbConfig.local);
+
+// Update pool when server changes
 app.post('/switch-server', (req, res) => {
   const { server } = req.body;
   if (server && llmConfig[server]) {
     currentServer = server;
+    // Update database pool with new configuration
+    pool.end();  // Close existing connections
+    pool = new Pool(dbConfig[server]);
     res.json({ success: true, currentServer: server });
   } else {
     res.status(400).json({ error: 'Invalid server selection' });
@@ -49,24 +75,15 @@ app.get('/current-server', (req, res) => {
   res.json({ currentServer, config: llmConfig[currentServer] });
 });
 
-// Database connection
-const pool = new Pool({
-  user: 'postgres',
-  host: 'localhost',
-  database: 'LLM_Canvas',
-  password: 'postgres',
-  port: 5432,
-});
-
 // Completions endpoint (for simple text completion)
 app.post('/completions', async (req, res) => {
   try {
-    const { prompt, maxTokens = 2000, n = 1, stream = false } = req.body;
+    const { prompt, n = 1, stream = false } = req.body;
     const config = llmConfig[currentServer];
 
     const response = await axios.post(`${config.baseUrl}/v1/completions`, {
       prompt: prompt,
-      max_tokens: maxTokens,
+      max_tokens: 16384,
       n: n,
       stream: stream
     });
@@ -87,11 +104,25 @@ app.post('/completions', async (req, res) => {
 // Chat completions endpoint (for chat-style interactions)
 app.post('/chat', async (req, res) => {
   try {
-    console.log('Received request:', req.body);
-    
     const { messages, ...parameters } = req.body;
     const config = llmConfig[currentServer];
     
+    // Extract system prompt and user input from messages
+    const systemPrompt = messages.find(m => m.role === 'system')?.content || '';
+    const userPrompt = messages.find(m => m.role === 'user')?.content || '';
+
+    // Log the chat call to database at the start
+    const dbLogPromise = pool.query(
+      'INSERT INTO llm_calls (model_name, system_prompt, input_prompt, parameters, output) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [
+        config.modelPath,
+        systemPrompt,
+        userPrompt,
+        JSON.stringify(parameters),
+        '[]' // Empty output initially, could be updated later if needed
+      ]
+    );
+
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -152,11 +183,27 @@ app.post('/chat/batch', async (req, res) => {
   const { messages, batchCount, ...parameters } = req.body;
   const config = llmConfig[currentServer];
   
+  // Extract user input from messages
+  const userPrompt = messages.find(m => m.role === 'user')?.content || '';
+
+  // Log the initial batch call to database
+  const dbLogPromise = pool.query(
+    'INSERT INTO llm_batch_calls (model_name, input_prompt, outputs, parameters) VALUES ($1, $2, $3, $4) RETURNING id',
+    [
+      config.modelPath,
+      JSON.stringify(userPrompt),
+      '[]', // Empty outputs initially
+      JSON.stringify(parameters)
+    ]
+  );
+
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
   try {
+    // Collect all outputs
+    const batchOutputs = Array(batchCount).fill('');
     const promises = Array(batchCount).fill().map(async (_, index) => {
       const vllmRequestBody = {
         model: config.modelPath,
@@ -165,7 +212,7 @@ app.post('/chat/batch', async (req, res) => {
         temperature: parameters.temperature || 0.7,
         top_p: parameters.topP || 0.7,
         top_k: parameters.topK || 50,
-        max_tokens: parameters.maxTokens || 2000
+        max_tokens: 16384
       };
 
       const response = await axios.post(`${config.baseUrl}/v1/chat/completions`, vllmRequestBody, {
@@ -181,9 +228,11 @@ app.post('/chat/batch', async (req, res) => {
             try {
               const data = JSON.parse(line.slice(6));
               if (data.choices && data.choices[0].delta.content) {
+                const content = data.choices[0].delta.content;
+                batchOutputs[index] += content; // Accumulate the content
                 res.write(`data: ${JSON.stringify({ 
                   index, 
-                  text: data.choices[0].delta.content
+                  text: content
                 })}\n\n`);
               }
             } catch (e) {
@@ -200,7 +249,16 @@ app.post('/chat/batch', async (req, res) => {
       });
     });
 
+    // Wait for all streams to complete
     await Promise.all(promises);
+
+    // Update database with all completed outputs
+    const dbLog = await dbLogPromise;
+    await pool.query(
+      'UPDATE llm_batch_calls SET outputs = $1 WHERE id = $2',
+      [JSON.stringify(batchOutputs), dbLog.rows[0].id]
+    );
+
     res.write('data: [DONE]\n\n');
     res.end();
 
