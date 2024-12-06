@@ -144,66 +144,71 @@ const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => 
     if (!section.input.trim()) return;
     
     setIsBatchProcessing(true);
-    setResponses(Array(batchCount).fill(''));
+    const initialResponses = Array(batchCount).fill('');
+    setResponses(initialResponses);
+    
+    // Create window only ONCE at the start
+    onShowBatchResults(initialResponses);
 
     try {
-      const { model, systemPrompt, ...parameters } = section.parameters || defaultParameters;
-      
-      const requestBody = {
-        messages: [
-          { role: "system", content: systemPrompt || '' },
-          { role: "user", content: section.input }
-        ],
-        batchCount,
-        ...parameters
-      };
-
-      const response = await fetch('http://localhost:3000/chat/batch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'text/event-stream'
-        },
-        body: JSON.stringify(requestBody)
-      });
-
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let currentResponses = Array(batchCount).fill('');
-      const processedChunks = new Set(); // Track processed chunks
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n');
+        const { model, systemPrompt, ...parameters } = section.parameters || defaultParameters;
         
-        for (const line of lines) {
-          if (line.startsWith('data: ') && !line.includes('[DONE]')) {
-            try {
-              const data = JSON.parse(line.slice(5));
-              const chunkId = `${data.index}-${data.text}`; // Create unique identifier for chunk
-              
-              if (data.index !== undefined && data.text && !processedChunks.has(chunkId)) {
-                processedChunks.add(chunkId);
-                currentResponses[data.index] = (currentResponses[data.index] || '') + data.text;
-                setResponses([...currentResponses]);
-                // Pass results up to parent
-                onShowBatchResults([...currentResponses]);
-              }
-            } catch (e) {
-              console.error('Error parsing SSE data:', e);
+        const requestBody = {
+            messages: [
+                { role: "system", content: systemPrompt || '' },
+                { role: "user", content: section.input }
+            ],
+            batchCount,
+            ...parameters
+        };
+
+        const response = await fetch('http://localhost:3000/chat/batch', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'text/event-stream'
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let currentResponses = Array(batchCount).fill('');
+        const processedChunks = new Set();
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+            
+            for (const line of lines) {
+                if (line.startsWith('data: ') && !line.includes('[DONE]')) {
+                    try {
+                        const data = JSON.parse(line.slice(5));
+                        const chunkId = `${data.index}-${data.text}`;
+                        
+                        if (data.index !== undefined && data.text && !processedChunks.has(chunkId)) {
+                            processedChunks.add(chunkId);
+                            currentResponses[data.index] = (currentResponses[data.index] || '') + data.text;
+                            // Just update the responses state, don't create new window
+                            setResponses([...currentResponses]);
+                            // Update existing window content
+                            onShowBatchResults([...currentResponses]);
+                        }
+                    } catch (e) {
+                        console.error('Error parsing SSE data:', e);
+                    }
+                }
             }
-          }
         }
-      }
     } catch (error) {
-      console.error('Batch processing error:', error);
+        console.error('Batch processing error:', error);
     } finally {
-      setIsBatchProcessing(false);
+        setIsBatchProcessing(false);
     }
   };
 

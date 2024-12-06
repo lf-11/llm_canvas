@@ -1,5 +1,9 @@
 # Dependencies
+
 llm-canvas/node_modules/
+
+backend/node_modules/
+
 
 # Build outputs
 

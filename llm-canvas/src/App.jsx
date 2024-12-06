@@ -7,12 +7,24 @@ function App() {
   const [floatingWindows, setFloatingWindows] = useState([]);
 
   const addBatchResults = (results) => {
-    setFloatingWindows(prev => [...prev, {
-      id: Date.now(),
-      type: 'batchResults',
-      results,
-      position: { x: 100, y: 100 }
-    }]);
+    setFloatingWindows(prev => {
+      const existingWindow = prev.find(w => w.type === 'batchResults');
+      
+      if (existingWindow) {
+        return prev.map(w => 
+          w.type === 'batchResults' 
+            ? { ...w, results } 
+            : w
+        );
+      } else {
+        return [...prev, {
+          id: Date.now(),
+          type: 'batchResults',
+          results,
+          position: { x: 100, y: 100 }
+        }];
+      }
+    });
   };
 
   const closeWindow = (id) => {

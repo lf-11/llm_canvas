@@ -2,10 +2,6 @@ import styled from 'styled-components';
 
 export const FloatingContainer = styled.div`
   position: fixed;
-  top: 0%;
-  left: 0%;
-  transform: translate(-50%, -50%);
-  z-index: 9999;
   background: #2d3748;
   border: 1px solid #000;
   color: white;
@@ -14,6 +10,7 @@ export const FloatingContainer = styled.div`
   height: 70vh;
   max-width: 90vw;
   max-height: 90vh;
+  z-index: 1000;
   resize: both;
   display: flex;
   flex-direction: column;
@@ -94,4 +91,4 @@ export const Tr = styled.tr`
   &:hover td {
     background: #3a4659;
   }
-`;
+`; 

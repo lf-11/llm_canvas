@@ -4,6 +4,22 @@ const axios = require('axios');
 const cors = require('cors');
 
 const app = express();
+
+// Configuration object for LLM servers
+const llmConfig = {
+  local: {
+    baseUrl: 'http://localhost:8000',
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf"
+  },
+  remote: {
+    baseUrl: 'http://192.168.178.61:8000',
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf"
+  }
+};
+
+// Current server configuration (default to local)
+let currentServer = 'local';
+
 app.use(express.json());
 app.use(cors({
   origin: 'http://localhost:5173',
@@ -17,7 +33,21 @@ app.use((req, res, next) => {
   next();
 });
 
-model = "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf"
+// Add endpoint to switch servers
+app.post('/switch-server', (req, res) => {
+  const { server } = req.body;
+  if (server && llmConfig[server]) {
+    currentServer = server;
+    res.json({ success: true, currentServer: server });
+  } else {
+    res.status(400).json({ error: 'Invalid server selection' });
+  }
+});
+
+// Add endpoint to get current server
+app.get('/current-server', (req, res) => {
+  res.json({ currentServer, config: llmConfig[currentServer] });
+});
 
 // Database connection
 const pool = new Pool({
@@ -32,8 +62,9 @@ const pool = new Pool({
 app.post('/completions', async (req, res) => {
   try {
     const { prompt, maxTokens = 2000, n = 1, stream = false } = req.body;
+    const config = llmConfig[currentServer];
 
-    const response = await axios.post('http://localhost:8000/v1/completions', {
+    const response = await axios.post(`${config.baseUrl}/v1/completions`, {
       prompt: prompt,
       max_tokens: maxTokens,
       n: n,
@@ -59,26 +90,25 @@ app.post('/chat', async (req, res) => {
     console.log('Received request:', req.body);
     
     const { messages, ...parameters } = req.body;
+    const config = llmConfig[currentServer];
     
-    // Set proper headers for streaming
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
 
-    // Use the full model path that we know works
     const vllmRequestBody = {
-      model: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf",
+      model: config.modelPath,
       messages: messages,
       stream: true,
       temperature: parameters.temperature || 0.7,
       top_p: parameters.topP || 0.7,
       top_k: parameters.topK || 50,
-      max_tokens: 16384 //parameters.maxTokens || 2000
+      max_tokens: 16384
     };
 
     console.log('Sending to vLLM:', vllmRequestBody);
 
-    const response = await axios.post('http://localhost:8000/v1/chat/completions', vllmRequestBody, {
+    const response = await axios.post(`${config.baseUrl}/v1/chat/completions`, vllmRequestBody, {
       responseType: 'stream'
     });
 
@@ -86,7 +116,6 @@ app.post('/chat', async (req, res) => {
       const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
       for (const line of lines) {
         if (line.startsWith('data: ')) {
-          // Don't send [DONE] to the client
           if (line.includes('[DONE]')) {
             return;
           }
@@ -118,9 +147,10 @@ app.post('/chat', async (req, res) => {
   }
 });
 
-// Modify the batch chat endpoint
+// Batch chat endpoint
 app.post('/chat/batch', async (req, res) => {
   const { messages, batchCount, ...parameters } = req.body;
+  const config = llmConfig[currentServer];
   
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -129,7 +159,7 @@ app.post('/chat/batch', async (req, res) => {
   try {
     const promises = Array(batchCount).fill().map(async (_, index) => {
       const vllmRequestBody = {
-        model: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf",
+        model: config.modelPath,
         messages: messages,
         stream: true,
         temperature: parameters.temperature || 0.7,
@@ -138,7 +168,7 @@ app.post('/chat/batch', async (req, res) => {
         max_tokens: parameters.maxTokens || 2000
       };
 
-      const response = await axios.post('http://localhost:8000/v1/chat/completions', vllmRequestBody, {
+      const response = await axios.post(`${config.baseUrl}/v1/chat/completions`, vllmRequestBody, {
         responseType: 'stream'
       });
 
@@ -181,7 +211,7 @@ app.post('/chat/batch', async (req, res) => {
   }
 });
 
-const PORT = 3000; // Choose an available port
+const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

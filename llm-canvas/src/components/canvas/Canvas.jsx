@@ -1,11 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import Card from '../card/Card';
 import FloatingBatchResults from '../floating-windows/FloatingBatchResults';
-import { CanvasContainer, CanvasContent, AddButton } from './Canvas.styles';
+import { 
+  CanvasContainer, 
+  CanvasContent, 
+  AddButton, 
+  ServerSwitch,
+  ServerSwitchContainer,
+  SwitchLabel 
+} from './Canvas.styles';
 
 const Canvas = ({ onShowBatchResults }) => {
   const [zoom, setZoom] = useState(1);
   const [cursorPosition, setCursorPosition] = useState({ x: 0, y: 0 });
+  const [isRemoteServer, setIsRemoteServer] = useState(false);
   const [cards, setCards] = useState([
     {
       id: 1,
@@ -22,6 +30,43 @@ const Canvas = ({ onShowBatchResults }) => {
       ]
     }
   ]);
+
+  const toggleServer = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/switch-server', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          server: isRemoteServer ? 'local' : 'remote'
+        }),
+      });
+
+      if (response.ok) {
+        setIsRemoteServer(!isRemoteServer);
+      } else {
+        console.error('Failed to switch server');
+      }
+    } catch (error) {
+      console.error('Error switching server:', error);
+    }
+  };
+
+  // Check current server on component mount
+  useEffect(() => {
+    const checkCurrentServer = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/current-server');
+        const data = await response.json();
+        setIsRemoteServer(data.currentServer === 'remote');
+      } catch (error) {
+        console.error('Error checking current server:', error);
+      }
+    };
+
+    checkCurrentServer();
+  }, []);
 
   const handleAddSection = (cardId) => {
     setCards(cards.map(card => {
@@ -147,6 +192,15 @@ const Canvas = ({ onShowBatchResults }) => {
           ))}
         </CanvasContent>
       </CanvasContainer>
+      <ServerSwitchContainer>
+        <SwitchLabel active={!isRemoteServer}>Local</SwitchLabel>
+        <ServerSwitch 
+          onClick={toggleServer} 
+          isRemote={isRemoteServer}
+          aria-label="Toggle between local and remote server"
+        />
+        <SwitchLabel active={isRemoteServer}>Remote</SwitchLabel>
+      </ServerSwitchContainer>
       <AddButton onClick={handleAddCard}>+</AddButton>
     </>
   );
