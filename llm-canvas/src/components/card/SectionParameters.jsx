@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ParametersContainer,
   SelectContainer,
@@ -14,9 +14,23 @@ import {
 
 const SectionParameters = ({ parameters, onParameterChange }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [systemPrompts, setSystemPrompts] = useState([]);
   const models = ['Mistral-Small-Instruct-2409-Q6_K_L.gguf'];
-  const systemPrompts = ['Default', 'Creative', 'Technical', 'Professional'];
   const parameterConfigs = ['Default', 'Creative', 'Precise', 'Diverse'];
+
+  useEffect(() => {
+    fetchSystemPrompts();
+  }, []);
+
+  const fetchSystemPrompts = async () => {
+    try {
+      const response = await fetch('http://localhost:3000/system-prompts');
+      const data = await response.json();
+      setSystemPrompts(data);
+    } catch (error) {
+      console.error('Error fetching system prompts:', error);
+    }
+  };
 
   // Add predefined parameter configurations
   const configs = {
@@ -50,6 +64,18 @@ const SectionParameters = ({ parameters, onParameterChange }) => {
     e.stopPropagation();
   };
 
+  const updatePromptUsage = async (promptId) => {
+    try {
+      await fetch('http://localhost:3000/system-prompts/increment-usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ promptId })
+      });
+    } catch (error) {
+      console.error('Error updating prompt usage:', error);
+    }
+  };
+
   return (
     <ParametersContainer onMouseDown={handleInputMouseDown}>
       {/* Model and System Prompt always visible */}
@@ -64,14 +90,36 @@ const SectionParameters = ({ parameters, onParameterChange }) => {
           ))}
         </StyledSelect>
         <StyledSelect
-          value={parameters.systemPrompt}
-          onChange={(e) => onParameterChange('systemPrompt', e.target.value)}
+          value={(() => {
+            if (parameters.systemPromptId) {
+              return parameters.systemPromptId;
+            }
+            if (parameters.systemPrompt) {
+              const matchingPrompt = systemPrompts.find(p => p.prompt_text === parameters.systemPrompt);
+              return matchingPrompt ? matchingPrompt.id : '';
+            }
+            return '';
+          })()}
+          onChange={(e) => {
+            const selectedValue = e.target.value;
+            const selectedPrompt = systemPrompts.find(p => p.id === parseInt(selectedValue));
+            if (selectedPrompt) {
+              onParameterChange('systemPromptId', parseInt(selectedValue));
+              onParameterChange('systemPrompt', selectedPrompt.prompt_text);
+              updatePromptUsage(selectedPrompt.id);
+            }
+          }}
           onMouseDown={handleInputMouseDown}
         >
+          <option value="">Select a System Prompt</option>
           {systemPrompts.map(prompt => (
-            <option key={prompt} value={prompt}>{prompt}</option>
+            <option key={prompt.id} value={prompt.id}>
+              {prompt.name}
+            </option>
           ))}
         </StyledSelect>
+
+    
       </SelectContainer>
 
       <HorizontalDivider />

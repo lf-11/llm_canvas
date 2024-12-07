@@ -15,7 +15,8 @@ import SectionParameters from './SectionParameters';
 
 const defaultParameters = {
   model: 'Mistral-Small-Instruct-2409-Q6_K_L.gguf',
-  systemPrompt: 'Default',
+  systemPrompt: '',
+  systemPromptId: null,
   temperature: 1.0,
   topK: 50,
   topP: 0.7,

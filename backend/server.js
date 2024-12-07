@@ -269,6 +269,28 @@ app.post('/chat/batch', async (req, res) => {
   }
 });
 
+// Add these endpoints after your existing endpoints
+app.get('/system-prompts', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, name, prompt_text FROM system_prompts ORDER BY usage_count DESC');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching system prompts:', error);
+    res.status(500).json({ error: 'Failed to fetch system prompts' });
+  }
+});
+
+app.post('/system-prompts/increment-usage', async (req, res) => {
+  const { promptId } = req.body;
+  try {
+    await pool.query('UPDATE system_prompts SET usage_count = usage_count + 1 WHERE id = $1', [promptId]);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error incrementing usage count:', error);
+    res.status(500).json({ error: 'Failed to update usage count' });
+  }
+});
+
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
