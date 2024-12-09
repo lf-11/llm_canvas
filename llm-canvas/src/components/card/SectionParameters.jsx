@@ -32,25 +32,20 @@ const SectionParameters = ({ parameters, onParameterChange }) => {
     }
   };
 
-  // Add predefined parameter configurations
+  // Simplified configs with only temperature
   const configs = {
     Default: {
-      temperature: 1.0,
-      topK: 50,
-      topP: 0.7,
-      minP: 0.1,
-      repetitionPenalty: 1.1,
-      frequencyPenalty: 0
+      temperature: 1.0
     },
     Creative: {
-      temperature: 1.5,
-      topK: 80,
-      topP: 0.9,
-      minP: 0.05,
-      repetitionPenalty: 1.0,
-      frequencyPenalty: -0.2
+      temperature: 1.5
     },
-    // ... add other configurations
+    Precise: {
+      temperature: 0.5
+    },
+    Diverse: {
+      temperature: 1.2
+    }
   };
 
   const handleConfigChange = (configName) => {
@@ -160,68 +155,28 @@ const SectionParameters = ({ parameters, onParameterChange }) => {
           </SliderContainer>
 
           <SliderContainer>
-            <Label>Top-k</Label>
-            <InputField
-              type="number"
-              value={parameters.topK}
-              onChange={(e) => onParameterChange('topK', parseFloat(e.target.value))}
-              onMouseDown={handleInputMouseDown}
-              step="1"
-              min="0"
-              max="100"
-            />
+            <Label>Top-k (TBD)</Label>
+            <InputField disabled value="TBD" />
           </SliderContainer>
 
           <SliderContainer>
-            <Label>Top-p</Label>
-            <InputField
-              type="number"
-              value={parameters.topP}
-              onChange={(e) => onParameterChange('topP', parseFloat(e.target.value))}
-              onMouseDown={handleInputMouseDown}
-              step="0.05"
-              min="0"
-              max="1"
-            />
+            <Label>Top-p (TBD)</Label>
+            <InputField disabled value="TBD" />
           </SliderContainer>
 
           <SliderContainer>
-            <Label>Min-p</Label>
-            <InputField
-              type="number"
-              value={parameters.minP}
-              onChange={(e) => onParameterChange('minP', parseFloat(e.target.value))}
-              onMouseDown={handleInputMouseDown}
-              step="0.05"
-              min="0"
-              max="1"
-            />
+            <Label>Min-p (TBD)</Label>
+            <InputField disabled value="TBD" />
           </SliderContainer>
 
           <SliderContainer>
-            <Label>Rep. Penalty</Label>
-            <InputField
-              type="number"
-              value={parameters.repetitionPenalty}
-              onChange={(e) => onParameterChange('repetitionPenalty', parseFloat(e.target.value))}
-              onMouseDown={handleInputMouseDown}
-              step="0.1"
-              min="1"
-              max="2"
-            />
+            <Label>Rep. Penalty (TBD)</Label>
+            <InputField disabled value="TBD" />
           </SliderContainer>
 
           <SliderContainer>
-            <Label>Freq. Penalty</Label>
-            <InputField
-              type="number"
-              value={parameters.frequencyPenalty}
-              onChange={(e) => onParameterChange('frequencyPenalty', parseFloat(e.target.value))}
-              onMouseDown={handleInputMouseDown}
-              step="0.1"
-              min="-2"
-              max="2"
-            />
+            <Label>Freq. Penalty (TBD)</Label>
+            <InputField disabled value="TBD" />
           </SliderContainer>
         </ParametersContent>
       )}
