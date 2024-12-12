@@ -45,6 +45,9 @@ const SectionParameters = ({ parameters, onParameterChange }) => {
     },
     Diverse: {
       temperature: 1.2
+    },
+    Deterministic: {
+      temperature: 0.0
     }
   };
 

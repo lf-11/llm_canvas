@@ -26,7 +26,7 @@ const defaultParameters = {
   maxTokens: 2000
 };
 
-const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => {
+const CardSection = ({ section, isLast, onInputChange, onShowBatchResults, onCopyToAll }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [batchCount, setBatchCount] = useState(5);
@@ -281,6 +281,18 @@ const CardSection = ({ section, isLast, onInputChange, onShowBatchResults }) => 
               }}
               disabled={isBatchProcessing}
             />
+            <BatchButton
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('Copy button clicked. Section input:', section.input);
+                onCopyToAll(section.input);
+              }}
+              onMouseDown={(e) => e.stopPropagation()}
+              disabled={!section.input.trim()}
+              title="Copy to all sections"
+            >
+              C
+            </BatchButton>
           </div>
         </SectionHeader>
         {isExpanded && (

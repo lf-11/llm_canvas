@@ -9,12 +9,18 @@ const app = express();
 const llmConfig = {
   local: {
     baseUrl: 'http://localhost:8000',
-    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf",
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Llama-3.3-70B-Instruct-Q4_K_M.gguf",
+    chatTemplate: {
+      stop: ["<|eot_id|>", "<|begin_of_text|>"]  // Add appropriate stop tokens
+    },
     host: 'localhost'
   },
   remote: {
     baseUrl: 'http://192.168.178.61:8000',
-    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Mistral-Small-Instruct-2409-Q6_K_L.gguf",
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Llama-3.3-70B-Instruct-Q4_K_M.gguf",
+    chatTemplate: {
+      stop: ["<|eot_id|>", "<|begin_of_text|>"]  // Add appropriate stop tokens
+    },
     host: '192.168.178.61'
   }
 };
@@ -83,7 +89,7 @@ app.post('/completions', async (req, res) => {
 
     const response = await axios.post(`${config.baseUrl}/v1/completions`, {
       prompt: prompt,
-      max_tokens: 16384,
+      max_tokens: 4096,
       n: n,
       stream: stream
     });
@@ -107,74 +113,81 @@ app.post('/chat', async (req, res) => {
     const { messages, ...parameters } = req.body;
     const config = llmConfig[currentServer];
     
-    // Extract system prompt and user input from messages
-    const systemPrompt = messages.find(m => m.role === 'system')?.content || '';
-    const userPrompt = messages.find(m => m.role === 'user')?.content || '';
-
-    // Log the chat call to database at the start
-    const dbLogPromise = pool.query(
-      'INSERT INTO llm_calls (model_name, system_prompt, input_prompt, parameters, output) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [
-        config.modelPath,
-        systemPrompt,
-        userPrompt,
-        JSON.stringify(parameters),
-        '[]' // Empty output initially, could be updated later if needed
-      ]
-    );
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
+    const MAX_CONTEXT_LENGTH = 4096;
+    // Rough estimate: reserve ~500 tokens for input messages
+    const MAX_COMPLETION_TOKENS = 3500;
+    
     const vllmRequestBody = {
       model: config.modelPath,
-      messages: messages,
+      messages: messages.map(msg => ({
+        role: msg.role,
+        content: msg.content || ''
+      })),
       stream: true,
       temperature: parameters.temperature || 0.7,
       top_p: parameters.topP || 0.7,
       top_k: parameters.topK || 50,
-      max_tokens: 16384
+      max_tokens: MAX_COMPLETION_TOKENS,
+      stop: ["<|eot_id|>", "<|begin_of_text|>"]
     };
 
     console.log('Sending to vLLM:', vllmRequestBody);
 
-    const response = await axios.post(`${config.baseUrl}/v1/chat/completions`, vllmRequestBody, {
-      responseType: 'stream'
-    });
+    try {
+      const response = await axios.post(`${config.baseUrl}/v1/chat/completions`, vllmRequestBody, {
+        responseType: 'stream'
+      });
 
-    response.data.on('data', (chunk) => {
-      const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          if (line.includes('[DONE]')) {
-            return;
-          }
-          
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (data.choices && data.choices[0].delta.content) {
-              res.write(`data: ${JSON.stringify({ text: data.choices[0].delta.content })}\n\n`);
+      response.data.on('data', (chunk) => {
+        const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            if (line.includes('[DONE]')) {
+              return;
             }
-          } catch (e) {
-            console.error('Error parsing chunk:', e);
+            
+            try {
+              const data = JSON.parse(line.slice(6));
+              if (data.choices && data.choices[0].delta.content) {
+                res.write(`data: ${JSON.stringify({ text: data.choices[0].delta.content })}\n\n`);
+              }
+            } catch (e) {
+              console.error('Error parsing chunk:', e);
+            }
           }
         }
+      });
+
+      response.data.on('end', () => {
+        res.end();
+      });
+
+    } catch (error) {
+      // Get the actual error message from vLLM
+      if (error.response && error.response.data) {
+        // If the data is a readable stream, read it
+        if (typeof error.response.data.pipe === 'function') {
+          let rawData = '';
+          error.response.data.on('data', chunk => {
+            rawData += chunk;
+          });
+          error.response.data.on('end', () => {
+            console.error('vLLM Error:', JSON.parse(rawData));
+            res.status(500).json({ error: JSON.parse(rawData) });
+          });
+        } else {
+          // If it's already parsed
+          console.error('vLLM Error:', error.response.data);
+          res.status(500).json({ error: error.response.data });
+        }
+      } else {
+        console.error('Error details:', error.message);
+        res.status(500).json({ error: error.message });
       }
-    });
-
-    response.data.on('end', () => {
-      res.end();
-    });
-
-  } catch (error) {
-    console.error('Error details:', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText
-    });
-
-    res.status(500).send(`Error: ${error.message}`);
+    }
+  } catch (outerError) {
+    console.error('Outer error:', outerError);
+    res.status(500).json({ error: outerError.message });
   }
 });
 
@@ -205,14 +218,20 @@ app.post('/chat/batch', async (req, res) => {
     // Collect all outputs
     const batchOutputs = Array(batchCount).fill('');
     const promises = Array(batchCount).fill().map(async (_, index) => {
+      const MAX_COMPLETION_TOKENS = 3500;
+      
       const vllmRequestBody = {
         model: config.modelPath,
-        messages: messages,
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content || ''
+        })),
         stream: true,
         temperature: parameters.temperature || 0.7,
         top_p: parameters.topP || 0.7,
         top_k: parameters.topK || 50,
-        max_tokens: 16384
+        max_tokens: MAX_COMPLETION_TOKENS,
+        stop: ["<|eot_id|>", "<|begin_of_text|>"]
       };
 
       const response = await axios.post(`${config.baseUrl}/v1/chat/completions`, vllmRequestBody, {

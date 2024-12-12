@@ -38,6 +38,14 @@ const Card = ({ id, sections, position, onAddSection, onInputChange, onDelete, o
     setIsEditing(false);
   };
 
+  const copyInputToAllSections = (sourceInput) => {
+    // Create an array of updated sections
+    const updatedSections = sections.map(section => {
+      onInputChange(section.id, 'input', sourceInput);
+      return section;
+    });
+  };
+
   return (
     <Draggable 
       bounds="parent" 
@@ -98,6 +106,7 @@ const Card = ({ id, sections, position, onAddSection, onInputChange, onDelete, o
               isLast={index === sections.length - 1}
               onInputChange={onInputChange}
               onShowBatchResults={onShowBatchResults}
+              onCopyToAll={copyInputToAllSections}
             />
           ))}
         </SectionsWrapper>

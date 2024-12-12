@@ -86,7 +86,7 @@ const Canvas = ({ onShowBatchResults }) => {
   };
 
   const handleInputChange = (cardId, sectionId, field, value) => {
-    setCards(cards.map(card => {
+    setCards(prevCards => prevCards.map(card => {
       if (card.id === cardId) {
         return {
           ...card,
