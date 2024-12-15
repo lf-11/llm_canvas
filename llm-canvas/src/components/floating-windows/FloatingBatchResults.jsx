@@ -10,29 +10,25 @@ import {
   Th,
   Td,
   Tr
-} from './FloatingWindow.styles';
+} from './FloatingWindow.styles.jsx';
 
 const FloatingBatchResults = ({ results, onClose }) => {
   const nodeRef = useRef(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
+  const isRowLayout = results.length > 5;
 
   useEffect(() => {
-    // Calculate center position when component mounts
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
-    const elementWidth = 0.7 * windowWidth;  // 70vw from styles
-    const elementHeight = 0.7 * windowHeight; // 70vh from styles
-    
-    // Get scroll position of the canvas container
-    const canvasContainer = document.querySelector('.canvas-container');
-    const scrollLeft = canvasContainer ? canvasContainer.scrollLeft : 0;
-    const scrollTop = canvasContainer ? canvasContainer.scrollTop : 0;
+    const elementWidth = isRowLayout ? 0.7 * windowWidth : 0.9 * windowWidth;
+    const elementHeight = isRowLayout ? 0.7 * windowHeight : 0.5 * windowHeight;
 
+    // Center in viewport, accounting for element size
     setPosition({
-      x: scrollLeft + (windowWidth - elementWidth) / 2,
-      y: scrollTop + (windowHeight - elementHeight) / 2,
+      x: (windowWidth - elementWidth) / 2,
+      y: (windowHeight - elementHeight) / 2
     });
-  }, []);
+  }, [results.length, isRowLayout]);
 
   const handleDrag = (e, data) => {
     setPosition({ x: data.x, y: data.y });
@@ -45,7 +41,10 @@ const FloatingBatchResults = ({ results, onClose }) => {
       onDrag={handleDrag}
       nodeRef={nodeRef}
     >
-      <FloatingContainer ref={nodeRef}>
+      <FloatingContainer ref={nodeRef} style={{
+        width: isRowLayout ? '70vw' : '90vw',
+        height: isRowLayout ? '70vh' : '50vh'
+      }}>
         <WindowHeader className="window-header">
           <WindowTitle>Batch Results</WindowTitle>
           <CloseButton onClick={onClose}>✖</CloseButton>
@@ -54,17 +53,40 @@ const FloatingBatchResults = ({ results, onClose }) => {
           <Table>
             <thead>
               <tr>
-                <Th>#</Th>
-                <Th>Output</Th>
+                {isRowLayout ? (
+                  <>
+                    <Th>#</Th>
+                    <Th>Output</Th>
+                  </>
+                ) : (
+                  results.map((_, index) => (
+                    <Th key={index} style={{ width: `${100/results.length}%` }}>
+                      #{index + 1}
+                    </Th>
+                  ))
+                )}
               </tr>
             </thead>
             <tbody>
-              {results.map((result, index) => (
-                <Tr key={index}>
-                  <Td>{index + 1}</Td>
-                  <Td>{result}</Td>
+              {isRowLayout ? (
+                results.map((result, index) => (
+                  <Tr key={index}>
+                    <Td isRowLayout>{index + 1}</Td>
+                    <Td isRowLayout>{result}</Td>
+                  </Tr>
+                ))
+              ) : (
+                <Tr>
+                  {results.map((result, index) => (
+                    <Td 
+                      key={index} 
+                      style={{ width: `${100/results.length}%` }}
+                    >
+                      {result}
+                    </Td>
+                  ))}
                 </Tr>
-              ))}
+              )}
             </tbody>
           </Table>
         </WindowContent>

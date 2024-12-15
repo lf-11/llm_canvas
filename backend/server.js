@@ -9,7 +9,7 @@ const app = express();
 const llmConfig = {
   local: {
     baseUrl: 'http://localhost:8000',
-    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Llama-3.3-70B-Instruct-Q4_K_M.gguf",
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Llama-3.3-70B-Instruct-Q4_K_S.gguf",
     chatTemplate: {
       stop: ["<|eot_id|>", "<|begin_of_text|>"]  // Add appropriate stop tokens
     },
@@ -17,7 +17,7 @@ const llmConfig = {
   },
   remote: {
     baseUrl: 'http://192.168.178.61:8000',
-    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Llama-3.3-70B-Instruct-Q4_K_M.gguf",
+    modelPath: "/home/lukas/projects/LLM_testing/webui/text-generation-webui-main/models/Llama-3.3-70B-Instruct-Q4_K_S.gguf",
     chatTemplate: {
       stop: ["<|eot_id|>", "<|begin_of_text|>"]  // Add appropriate stop tokens
     },
@@ -115,7 +115,7 @@ app.post('/chat', async (req, res) => {
     
     const MAX_CONTEXT_LENGTH = 4096;
     // Rough estimate: reserve ~500 tokens for input messages
-    const MAX_COMPLETION_TOKENS = 3500;
+    const MAX_COMPLETION_TOKENS = 2500;
     
     const vllmRequestBody = {
       model: config.modelPath,
@@ -124,7 +124,7 @@ app.post('/chat', async (req, res) => {
         content: msg.content || ''
       })),
       stream: true,
-      temperature: parameters.temperature || 0.7,
+      temperature: parameters.temperature || 0.0,
       top_p: parameters.topP || 0.7,
       top_k: parameters.topK || 50,
       max_tokens: MAX_COMPLETION_TOKENS,
@@ -218,7 +218,7 @@ app.post('/chat/batch', async (req, res) => {
     // Collect all outputs
     const batchOutputs = Array(batchCount).fill('');
     const promises = Array(batchCount).fill().map(async (_, index) => {
-      const MAX_COMPLETION_TOKENS = 3500;
+      const MAX_COMPLETION_TOKENS = 2500;
       
       const vllmRequestBody = {
         model: config.modelPath,
@@ -227,7 +227,7 @@ app.post('/chat/batch', async (req, res) => {
           content: msg.content || ''
         })),
         stream: true,
-        temperature: parameters.temperature || 0.7,
+        temperature: parameters.temperature || 0.0,
         top_p: parameters.topP || 0.7,
         top_k: parameters.topK || 50,
         max_tokens: MAX_COMPLETION_TOKENS,

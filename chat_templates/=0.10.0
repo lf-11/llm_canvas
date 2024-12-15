@@ -1,0 +1,14 @@
+Requirement already satisfied: gguf in /home/lukas/miniconda3/lib/python3.12/site-packages (0.9.1)
+Collecting gguf
+  Downloading gguf-0.11.0-py3-none-any.whl.metadata (3.6 kB)
+Requirement already satisfied: numpy>=1.17 in /home/lukas/miniconda3/lib/python3.12/site-packages (from gguf) (1.26.4)
+Requirement already satisfied: pyyaml>=5.1 in /home/lukas/miniconda3/lib/python3.12/site-packages (from gguf) (6.0.2)
+Requirement already satisfied: sentencepiece<=0.2.0,>=0.1.98 in /home/lukas/miniconda3/lib/python3.12/site-packages (from gguf) (0.2.0)
+Requirement already satisfied: tqdm>=4.27 in /home/lukas/miniconda3/lib/python3.12/site-packages (from gguf) (4.66.4)
+Downloading gguf-0.11.0-py3-none-any.whl (74 kB)
+Installing collected packages: gguf
+  Attempting uninstall: gguf
+    Found existing installation: gguf 0.9.1
+    Uninstalling gguf-0.9.1:
+      Successfully uninstalled gguf-0.9.1
+Successfully installed gguf-0.11.0

@@ -2,6 +2,10 @@ import styled from 'styled-components';
 
 export const FloatingContainer = styled.div`
   position: fixed;
+  top: 0%;
+  left: 0%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
   background: #2d3748;
   border: 1px solid #000;
   color: white;
@@ -10,7 +14,6 @@ export const FloatingContainer = styled.div`
   height: 70vh;
   max-width: 90vw;
   max-height: 90vh;
-  z-index: 1000;
   resize: both;
   display: flex;
   flex-direction: column;
@@ -78,13 +81,17 @@ export const Td = styled.td`
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   white-space: pre-wrap;
   background: #2d3748;
+  color: white;
+  vertical-align: top;
 
-  &:first-child {
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
-    width: 50px;
-    text-align: center;
-    color: #a0aec0;
-  }
+  ${props => props.isRowLayout && `
+    &:first-child {
+      border-right: 1px solid rgba(255, 255, 255, 0.1);
+      width: 50px;
+      text-align: center;
+      color: #a0aec0;
+    }
+  `}
 `;
 
 export const Tr = styled.tr`
